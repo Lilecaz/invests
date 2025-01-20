@@ -6,7 +6,21 @@ st.title("Analyse des Investissements en Cryptomonnaies")
 # Permettre à l'utilisateur de télécharger un fichier CSV
 uploaded_file = st.file_uploader("Choisissez un fichier CSV", type="csv")
 
-if uploaded_file is not None:
+if uploaded_file is None:
+    # Exemple de tableau CSV
+    example_data = {
+        "Cryptomonnaie": ["BTC", "ETH", "XRP"],
+        "Date d'achat": ["01/01/2022", "02/01/2022", "03/01/2022"],
+        "Quantite": [0.1, 0.5, 100],
+        "Montant total d'achat(EUR)": [3000, 1500, 200],
+        "Prix d'achat": [30000, 3000, 2],
+        "Frais": [10, 5, 1]
+    }
+    example_df = pd.DataFrame(example_data)
+
+    st.header("Exemple de format de fichier CSV")
+    st.dataframe(example_df)
+else:
     try:
         # Lire le fichier CSV téléchargé avec l'encodage correct
         df = pd.read_csv(uploaded_file, delimiter=';', decimal=',', encoding='ISO-8859-1')
@@ -44,5 +58,3 @@ if uploaded_file is not None:
         st.dataframe(montant_total_investi)
     except Exception as e:
         st.error(f"Erreur lors de la lecture du fichier CSV ou du traitement des données : {e}")
-else:
-    st.write("Veuillez télécharger un fichier CSV pour commencer l'analyse.")
