@@ -1,13 +1,11 @@
 import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
 
-st.title("Analyse des Investissements en Cryptomonnaies")
+st.set_page_config(page_title="Analyse Crypto", layout="wide")
+st.title("📊 Analyse des Investissements en Cryptomonnaies")
 
-# Permettre à l'utilisateur de télécharger un fichier CSV
-uploaded_file = st.file_uploader("Choisissez un fichier CSV", type="csv")
-
-if uploaded_file is None:
-    # Exemple de tableau CSV
+def afficher_exemple():
     example_data = {
         "Cryptomonnaie": ["BTC", "ETH", "XRP"],
         "Date d'achat": ["01/01/2022", "02/01/2022", "03/01/2022"],
@@ -16,45 +14,61 @@ if uploaded_file is None:
         "Prix d'achat": [30000, 3000, 2],
         "Frais": [10, 5, 1]
     }
-    example_df = pd.DataFrame(example_data)
+    st.subheader("📁 Exemple de format CSV attendu")
+    st.dataframe(pd.DataFrame(example_data))
 
-    st.header("Exemple de format de fichier CSV")
-    st.dataframe(example_df)
-else:
+def charger_donnees(fichier):
     try:
-        # Lire le fichier CSV téléchargé avec l'encodage correct
-        df = pd.read_csv(uploaded_file, delimiter=';', decimal=',', encoding='ISO-8859-1')
+        df = pd.read_csv(fichier, delimiter=';', decimal=',', encoding='ISO-8859-1')
+        df = df.rename(columns={"Montant total d'achat(EUR)": "Montant_total_achat_EUR"})  # évite le bug d'apostrophe
+        return df
+    except Exception as e:
+        st.error(f"❌ Erreur de lecture du fichier : {e}")
+        return None
 
-        # Renommer la colonne pour éviter les problèmes d'apostrophe
-        df.rename(columns={"Montant total d'achat(EUR)": "Montant_total_achat_EUR"}, inplace=True)
+def traiter_donnees(df):
+    try:
+        df["Montant_total_achat_EUR"] = pd.to_numeric(df["Montant_total_achat_EUR"], errors='coerce')
+        df["Frais"] = pd.to_numeric(df["Frais"], errors='coerce')
+        df["Quantite"] = pd.to_numeric(df["Quantite"], errors='coerce')
+        df["Montant total investi"] = df["Montant_total_achat_EUR"] + df["Frais"]
+        return df
+    except Exception as e:
+        st.error(f"❌ Erreur de traitement des données : {e}")
+        return None
 
-        # Convertir les colonnes en types numériques
-        df['Montant_total_achat_EUR'] = pd.to_numeric(df['Montant_total_achat_EUR'], errors='coerce')
-        df['Frais'] = pd.to_numeric(df['Frais'], errors='coerce')
+def afficher_resultats(df):
+    total_investi = df.groupby("Cryptomonnaie")["Montant_total_achat_EUR"].sum()
+    quantite_totale = df.groupby("Cryptomonnaie")["Quantite"].sum()
+    montant_total_investi = df.groupby("Cryptomonnaie")["Montant total investi"].sum()
+    total_general = montant_total_investi.sum()
 
-        # Calculer le montant total investi par cryptomonnaie
-        total_investi = df.groupby('Cryptomonnaie')['Montant_total_achat_EUR'].sum()
+    st.metric(label="💰 Total investi (EUR)", value=f"{total_general:,.2f}")
 
-        # Calculer la quantité totale achetée par cryptomonnaie
-        quantite_totale = df.groupby('Cryptomonnaie')['Quantite'].sum()
-
-        # Calculer le montant total investi par cryptomonnaie en tenant compte des frais
-        df['Montant_total_investi'] = df['Montant_total_achat_EUR'] + df['Frais']
-        montant_total_investi = df.groupby('Cryptomonnaie')['Montant_total_investi'].sum()
-
-        # Calculer le montant total d'argent investi
-        total_argent_investi = montant_total_investi.sum()
-
-        # Afficher le total d'argent investi en haut à gauche
-        st.metric(label="Total d'argent investi (EUR)", value=f"{total_argent_investi:.2f}")
-
-        st.header("Montant total investi par cryptomonnaie")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("💸 Montant investi par cryptomonnaie")
         st.bar_chart(total_investi)
-
-        st.header("Quantité totale achetée par cryptomonnaie")
+    with col2:
+        st.subheader("📦 Quantité totale par cryptomonnaie")
         st.bar_chart(quantite_totale)
 
-        st.header("Montant total investi par cryptomonnaie (incluant les frais)")
-        st.dataframe(montant_total_investi)
-    except Exception as e:
-        st.error(f"Erreur lors de la lecture du fichier CSV ou du traitement des données : {e}")
+    st.subheader("🧾 Détail du montant investi avec frais")
+    st.dataframe(montant_total_investi.reset_index().rename(columns={"Montant total investi": "Montant (EUR)"}))
+
+    with st.expander("📊 Voir en camembert"):
+        fig, ax = plt.subplots()
+        montant_total_investi.plot.pie(autopct='%1.1f%%', ax=ax, ylabel='', title="Répartition des investissements")
+        st.pyplot(fig)
+
+# --- Application principale ---
+uploaded_file = st.file_uploader("📤 Téléversez un fichier CSV", type="csv")
+
+if uploaded_file is None:
+    afficher_exemple()
+else:
+    df = charger_donnees(uploaded_file)
+    if df is not None:
+        df = traiter_donnees(df)
+        if df is not None:
+            afficher_resultats(df)
